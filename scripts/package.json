@@ -1,0 +1,22 @@
+{
+  "name": "protocol-icons-scripts",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate": "tsx src/index.ts",
+    "generate:watch": "tsx src/index.ts --watch",
+    "crop": "tsx src/circularCrop.ts"
+  },
+  "dependencies": {
+    "@1delta/initializer-sdk": "latest",
+    "node-fetch": "^3.3.2",
+    "sharp": "^0.33.4",
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
