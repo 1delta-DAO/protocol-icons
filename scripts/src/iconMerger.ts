@@ -172,15 +172,25 @@ export async function mergeSplitWithBadge(
 export async function circularCropIcon(
   inputSrc: string,
   outputFile: string,
+  size = ICON_DEFAULTS.diameter,
 ): Promise<void> {
   const buf = await loadImageBuffer(inputSrc)
   const meta = await sharp(buf).metadata()
   if (!meta.width || !meta.height) throw new Error('Image has no dimensions')
 
-  const result = await sharp(buf)
+  // Resize to square (contain + transparent pad) so the circle mask aligns.
+  const square = await sharp(buf)
+    .resize(size, size, {
+      fit: 'contain',
+      background: { r: 255, g: 255, b: 255, alpha: 0 },
+    })
     .flatten({ background: '#ffffff' })
     .ensureAlpha()
-    .composite([{ input: circleSVG(meta.width), blend: 'dest-in' }])
+    .png()
+    .toBuffer()
+
+  const result = await sharp(square)
+    .composite([{ input: circleSVG(size), blend: 'dest-in' }])
     .webp()
     .toBuffer()
 

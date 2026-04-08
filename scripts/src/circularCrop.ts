@@ -51,10 +51,13 @@ async function main() {
     output = path.join(parsed.dir, `${parsed.name}.webp`)
   }
 
-  // Resolve relative paths
-  if (!output.startsWith('/')) {
-    output = path.resolve(process.cwd(), output)
+  // Auto-append .webp if missing
+  if (!output.toLowerCase().endsWith('.webp')) {
+    output = `${output}.webp`
   }
+
+  // Resolve relative paths against cwd
+  output = path.resolve(process.cwd(), output)
 
   console.log(`Cropping: ${input}`)
   console.log(`Output:   ${output}`)
