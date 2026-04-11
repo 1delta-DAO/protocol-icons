@@ -6,6 +6,7 @@
   "scripts": {
     "generate": "tsx src/index.ts",
     "generate:watch": "tsx src/index.ts --watch",
+    "generate:silo": "tsx src/generateSilo.ts",
     "crop": "tsx src/circularCrop.ts"
   },
   "dependencies": {

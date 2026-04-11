@@ -133,6 +133,14 @@ export const ICON_DEFAULTS = {
 export const MORPHO_BADGE_URL =
   'https://raw.githubusercontent.com/1delta-DAO/protocol-icons/main/lender/morpho_blue.webp'
 
+import path from 'path'
+
+/** Local Silo badge — used as the protocol overlay for v2/v3 market icons. */
+export const SILO_BADGE_PATH = path.resolve(
+  import.meta.dirname ?? '.',
+  '../../lender/silo.webp',
+)
+
 // ─── Cycle interval (default 30 min) ─────────────────────────────────────────
 
 export const DEFAULT_CYCLE_INTERVAL_MS = 30 * 60 * 1000
