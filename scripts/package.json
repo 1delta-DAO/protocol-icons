@@ -7,6 +7,7 @@
     "generate": "tsx src/index.ts",
     "generate:watch": "tsx src/index.ts --watch",
     "generate:silo": "tsx src/generateSilo.ts",
+    "generate:fluid": "tsx src/generateFluid.ts",
     "crop": "tsx src/circularCrop.ts"
   },
   "dependencies": {

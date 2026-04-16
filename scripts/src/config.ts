@@ -141,6 +141,12 @@ export const SILO_BADGE_PATH = path.resolve(
   '../../lender/silo.webp',
 )
 
+/** Local Fluid badge — used as the protocol overlay for Fluid vault icons. */
+export const FLUID_BADGE_PATH = path.resolve(
+  import.meta.dirname ?? '.',
+  '../../lender/fluid.webp',
+)
+
 // ─── Cycle interval (default 30 min) ─────────────────────────────────────────
 
 export const DEFAULT_CYCLE_INTERVAL_MS = 30 * 60 * 1000
