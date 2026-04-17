@@ -38,7 +38,7 @@ interface GenerationStats {
   missingLogos: number
 }
 
-async function processChain(chainId: string): Promise<GenerationStats> {
+async function processChain(chainId: string, force: boolean): Promise<GenerationStats> {
   const stats: GenerationStats = { total: 0, created: 0, skipped: 0, failed: 0, missingLogos: 0 }
   const name = chainName(chainId)
 
@@ -90,8 +90,8 @@ async function processChain(chainId: string): Promise<GenerationStats> {
     const enumName = marketEnumName(market.uniqueKey)
     const filePath = outPath(enumName)
 
-    // Safe: skip if icon already exists
-    if (fs.existsSync(filePath)) {
+    // Safe: skip if icon already exists (unless --force)
+    if (!force && fs.existsSync(filePath)) {
       stats.skipped++
       continue
     }
@@ -123,16 +123,17 @@ async function processChain(chainId: string): Promise<GenerationStats> {
 
 // ─── Main run ────────────────────────────────────────────────────────────────
 
-async function runOnce(): Promise<void> {
+async function runOnce(force: boolean): Promise<void> {
   console.log(`\n${'='.repeat(60)}`)
   console.log(`Morpho Icon Generator — ${new Date().toISOString()}`)
   console.log(`Processing ${ALL_CHAINS.length} chains...`)
+  if (force) console.log('Force mode: existing icons will be overwritten.')
   console.log('='.repeat(60))
 
   const totals: GenerationStats = { total: 0, created: 0, skipped: 0, failed: 0, missingLogos: 0 }
 
   for (const chainId of ALL_CHAINS) {
-    const stats = await processChain(chainId)
+    const stats = await processChain(chainId, force)
     totals.total += stats.total
     totals.created += stats.created
     totals.skipped += stats.skipped
@@ -151,19 +152,20 @@ async function runOnce(): Promise<void> {
 // ─── Entry point ─────────────────────────────────────────────────────────────
 
 const isWatch = process.argv.includes('--watch')
+const force = process.argv.includes('--force')
 const intervalArg = process.argv.find((a) => a.startsWith('--interval='))
 const intervalMs = intervalArg
   ? parseInt(intervalArg.split('=')[1], 10) * 60 * 1000  // --interval=N  (minutes)
   : DEFAULT_CYCLE_INTERVAL_MS
 
 async function main() {
-  await runOnce()
+  await runOnce(force)
 
   if (isWatch) {
     console.log(`\nWatch mode: next run in ${intervalMs / 60000} minutes. Press Ctrl+C to stop.`)
     setInterval(async () => {
       try {
-        await runOnce()
+        await runOnce(force)
       } catch (err) {
         console.error('Cycle error:', (err as Error).message)
       }

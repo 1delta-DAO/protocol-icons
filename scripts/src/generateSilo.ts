@@ -45,6 +45,7 @@ async function processChain(
   version: SiloVersion,
   chainId: string,
   markets: SiloMarket[],
+  force: boolean,
 ): Promise<Stats> {
   const stats = newStats()
   const name = chainName(chainId)
@@ -79,7 +80,7 @@ async function processChain(
     const enumName = siloMarketEnumName(version, market.siloConfig)
     const filePath = outPath(enumName)
 
-    if (fs.existsSync(filePath)) {
+    if (!force && fs.existsSync(filePath)) {
       stats.skipped++
       continue
     }
@@ -101,7 +102,7 @@ async function processChain(
 
 // ─── Per-version processing ──────────────────────────────────────────────────
 
-async function processVersion(version: SiloVersion): Promise<Stats> {
+async function processVersion(version: SiloVersion, force: boolean): Promise<Stats> {
   const totals = newStats()
 
   let byChain: SiloMarketsByChain
@@ -118,7 +119,7 @@ async function processVersion(version: SiloVersion): Promise<Stats> {
   for (const chainId of chainIds) {
     const markets = byChain[chainId] ?? []
     if (markets.length === 0) continue
-    const stats = await processChain(version, chainId, markets)
+    const stats = await processChain(version, chainId, markets, force)
     totals.total += stats.total
     totals.created += stats.created
     totals.skipped += stats.skipped
@@ -141,15 +142,17 @@ async function main() {
   const versionArg = process.argv.find((a) => a.startsWith('--version='))
   const requested = versionArg?.split('=')[1] as SiloVersion | undefined
   const versions: SiloVersion[] = requested ? [requested] : ['v2', 'v3']
+  const force = process.argv.includes('--force')
 
   console.log(`\n${'='.repeat(60)}`)
   console.log(`Silo Icon Generator — ${new Date().toISOString()}`)
   console.log(`Versions: ${versions.join(', ')}`)
+  if (force) console.log('Force mode: existing icons will be overwritten.')
   console.log('='.repeat(60))
 
   const grand = newStats()
   for (const v of versions) {
-    const s = await processVersion(v)
+    const s = await processVersion(v, force)
     grand.total += s.total
     grand.created += s.created
     grand.skipped += s.skipped

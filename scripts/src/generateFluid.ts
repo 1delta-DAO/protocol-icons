@@ -36,11 +36,21 @@ interface Stats {
 
 const newStats = (): Stats => ({ total: 0, created: 0, skipped: 0, failed: 0, missingLogos: 0 })
 
+// Fluid uses the EIP-7528 native placeholder; our token lists key native as zero address.
+const NATIVE_PLACEHOLDER = '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
+
+const normalizeAsset = (addr?: string): string | undefined => {
+  const a = addr?.toLowerCase()
+  return a === NATIVE_PLACEHOLDER ? ZERO_ADDRESS : a
+}
+
 // ─── Per-chain processing ────────────────────────────────────────────────────
 
 async function processChain(
   chainId: string,
   vaults: Record<string, FluidVault>,
+  force: boolean,
 ): Promise<Stats> {
   const stats = newStats()
   const name = chainName(chainId)
@@ -60,8 +70,8 @@ async function processChain(
     stats.total++
 
     // Use first supply asset as left (collateral), first borrow asset as right (debt)
-    const supplyAsset = vault.supply?.assets?.[0]?.underlying?.toLowerCase()
-    const borrowAsset = vault.borrow?.assets?.[0]?.underlying?.toLowerCase()
+    const supplyAsset = normalizeAsset(vault.supply?.assets?.[0]?.underlying)
+    const borrowAsset = normalizeAsset(vault.borrow?.assets?.[0]?.underlying)
     if (!supplyAsset || !borrowAsset) continue
 
     const supplyToken = tokenMap[supplyAsset]
@@ -77,7 +87,7 @@ async function processChain(
     const enumName = fluidVaultEnumName(chainId, vault.vaultId)
     const filePath = outPath(enumName)
 
-    if (fs.existsSync(filePath)) {
+    if (!force && fs.existsSync(filePath)) {
       stats.skipped++
       continue
     }
@@ -108,8 +118,11 @@ async function main() {
     process.exit(1)
   }
 
+  const force = process.argv.includes('--force')
+
   console.log(`\n${'='.repeat(60)}`)
   console.log(`Fluid Icon Generator — ${new Date().toISOString()}`)
+  if (force) console.log('Force mode: existing icons will be overwritten.')
   console.log('='.repeat(60))
 
   let byChain: FluidVaultsByChain
@@ -127,7 +140,7 @@ async function main() {
   for (const chainId of chainIds) {
     const vaults = byChain[chainId] ?? {}
     if (Object.keys(vaults).length === 0) continue
-    const stats = await processChain(chainId, vaults)
+    const stats = await processChain(chainId, vaults, force)
     grand.total += stats.total
     grand.created += stats.created
     grand.skipped += stats.skipped

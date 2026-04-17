@@ -103,10 +103,14 @@ export async function mergeSplitWithBadge(
     loadImageBuffer(badgeSrc),
   ])
 
-  // Resize to square
+  // Letterbox into a square viewbox so non-square logos aren't cropped by the half-extract.
+  const squareOpts = {
+    fit: 'contain' as const,
+    background: { r: 255, g: 255, b: 255, alpha: 0 },
+  }
   const [lRes, rRes] = await Promise.all([
-    sharp(lb).resize(diameter, diameter).png().toBuffer(),
-    sharp(rb).resize(diameter, diameter).png().toBuffer(),
+    sharp(lb).resize(diameter, diameter, squareOpts).png().toBuffer(),
+    sharp(rb).resize(diameter, diameter, squareOpts).png().toBuffer(),
   ])
 
   // Extract halves
@@ -138,7 +142,10 @@ export async function mergeSplitWithBadge(
   })
     .composite([
       {
-        input: await sharp(bb).resize(badgeSize.width, badgeSize.height).png().toBuffer(),
+        input: await sharp(bb)
+          .resize(badgeSize.width, badgeSize.height, squareOpts)
+          .png()
+          .toBuffer(),
         left: badgePadding,
         top: badgePadding,
       },
