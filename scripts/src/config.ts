@@ -147,6 +147,12 @@ export const FLUID_BADGE_PATH = path.resolve(
   '../../lender/fluid.webp',
 )
 
+/** Local Gearbox core icon — used as the LEFT half for Gearbox v3 market icons. */
+export const GEARBOX_CORE_ICON_PATH = path.resolve(
+  import.meta.dirname ?? '.',
+  '../../lender/gearbox_v3.webp',
+)
+
 // ─── Cycle interval (default 30 min) ─────────────────────────────────────────
 
 export const DEFAULT_CYCLE_INTERVAL_MS = 30 * 60 * 1000
