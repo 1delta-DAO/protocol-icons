@@ -13,6 +13,7 @@ import fs from 'fs'
 import path from 'path'
 import sharp from 'sharp'
 import { formatEther } from 'viem'
+import nodeFetch from 'node-fetch'
 import { ICON_DEFAULTS, MORPHO_BADGE_URL } from './config.js'
 
 // ─── Output directory ────────────────────────────────────────────────────────
@@ -25,14 +26,28 @@ export function outPath(filename: string): string {
 
 // ─── Image loading ───────────────────────────────────────────────────────────
 
+// node-fetch is used instead of Node's undici `fetch` because some CDNs
+// (notably Coingecko's assets host) intermittently ETIMEDOUT against undici
+// on certain networks; node-fetch's default stack avoids this.
 export async function loadImageBuffer(source: string | Buffer): Promise<Buffer> {
   if (Buffer.isBuffer(source)) return source
-  if (source.startsWith('http')) {
-    const res = await fetch(source)
-    if (!res.ok) throw new Error(`Failed to fetch ${source}: ${res.statusText}`)
-    return Buffer.from(await res.arrayBuffer())
+  if (!source.startsWith('http')) return fs.promises.readFile(source)
+
+  const MAX_ATTEMPTS = 3
+  let lastErr: unknown
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const res = await nodeFetch(source)
+      if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`)
+      return Buffer.from(await res.arrayBuffer())
+    } catch (err) {
+      lastErr = err
+      if (attempt < MAX_ATTEMPTS) {
+        await new Promise((r) => setTimeout(r, 500 * attempt))
+      }
+    }
   }
-  return fs.promises.readFile(source)
+  throw new Error(`Failed to fetch ${source}: ${(lastErr as Error).message}`)
 }
 
 // ─── SVG circle mask ─────────────────────────────────────────────────────────
