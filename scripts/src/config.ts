@@ -37,6 +37,11 @@ export const ChainId = {
   BERACHAIN: '80094',
   KATANA: '824',
   HYPEREVM: '999',
+  ABSTRACT: '2741',
+  // Mystic Finance (Morpho Blue fork) chains
+  FLARE: '14',
+  CITREA: '4114',
+  PLUME: '98866',
 } as const
 
 export type ChainIdValue = (typeof ChainId)[keyof typeof ChainId]
@@ -77,15 +82,29 @@ export const API_CHAINS: string[] = [
   ChainId.MANTLE,
   ChainId.BNB,
   ChainId.AVALANCHE,
+  ChainId.BERACHAIN,
+  ChainId.KATANA,
+  ChainId.HYPEREVM,
+  ChainId.ABSTRACT,
 ]
 
 /** Chains served by subgraph only */
 export const SUBGRAPH_CHAINS: string[] = Object.keys(MORPHO_SUBGRAPH_URLS)
 
+/** Chains served by the Mystic Finance Morpho-fork API */
+export const MYSTIC_CHAINS: string[] = [
+  ChainId.FLARE,
+  ChainId.CITREA,
+  ChainId.PLUME,
+]
+
 /** All chains we attempt to generate icons for */
 export const ALL_CHAINS: string[] = [
   ...API_CHAINS,
   ...SUBGRAPH_CHAINS.filter((c) => !API_CHAINS.includes(c)),
+  ...MYSTIC_CHAINS.filter(
+    (c) => !API_CHAINS.includes(c) && !SUBGRAPH_CHAINS.includes(c),
+  ),
 ]
 
 // ─── Human-readable chain names (for logging) ───────────────────────────────
@@ -115,6 +134,10 @@ export const CHAIN_NAMES: Record<string, string> = {
   [ChainId.BERACHAIN]: 'Berachain',
   [ChainId.KATANA]: 'Katana',
   [ChainId.HYPEREVM]: 'HyperEVM',
+  [ChainId.ABSTRACT]: 'Abstract',
+  [ChainId.FLARE]: 'Flare',
+  [ChainId.CITREA]: 'Citrea',
+  [ChainId.PLUME]: 'Plume',
 }
 
 export const chainName = (id: string) => CHAIN_NAMES[id] ?? `Chain(${id})`

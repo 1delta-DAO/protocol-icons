@@ -14,6 +14,11 @@ import {
   MORPHO_SUBGRAPH_URLS,
   chainName,
 } from './config.js'
+import {
+  hasMysticApi,
+  fetchMarketsFromMysticApi,
+} from './fetchMysticApi.js'
+import { hasOnchain, fetchFromOnchain } from './onchainMorpho.js'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -136,6 +141,22 @@ async function fetchFromSubgraph(chainId: string): Promise<MorphoMarket[]> {
 export async function fetchMarketsForChain(chainId: string): Promise<MorphoMarket[]> {
   const hasApi = API_CHAINS.includes(chainId)
   const hasSubgraph = chainId in MORPHO_SUBGRAPH_URLS
+  const hasOn = hasOnchain(chainId)
+  const hasMystic = hasMysticApi(chainId)
+
+  // Mystic Finance fork has its own API and shape; dispatch first.
+  if (hasMystic) {
+    try {
+      const result = await fetchMarketsFromMysticApi(chainId)
+      return (result.markets.items ?? []) as MorphoMarket[]
+    } catch (err) {
+      console.error(
+        `  [${chainName(chainId)}] Mystic API failed:`,
+        (err as Error).message,
+      )
+      return []
+    }
+  }
 
   // Try API first
   if (hasApi) {
@@ -143,21 +164,36 @@ export async function fetchMarketsForChain(chainId: string): Promise<MorphoMarke
       const markets = await fetchFromApi(chainId)
       if (markets.length > 0) return markets
     } catch (err) {
-      console.warn(`  [${chainName(chainId)}] API failed, trying subgraph...`, (err as Error).message)
+      console.warn(
+        `  [${chainName(chainId)}] API failed, trying fallback...`,
+        (err as Error).message,
+      )
     }
   }
 
-  // Fallback to subgraph
+  // Subgraph fallback (preferred when configured)
   if (hasSubgraph) {
     try {
       return await fetchFromSubgraph(chainId)
     } catch (err) {
-      console.error(`  [${chainName(chainId)}] Subgraph also failed:`, (err as Error).message)
+      console.error(
+        `  [${chainName(chainId)}] Subgraph failed:`,
+        (err as Error).message,
+      )
+    }
+  } else if (hasOn) {
+    // No subgraph → fall back to on-chain log scan.
+    try {
+      return await fetchFromOnchain(chainId)
+    } catch (err) {
+      console.error(
+        `  [${chainName(chainId)}] On-chain fetch failed:`,
+        (err as Error).message,
+      )
     }
   }
 
-  // Both failed or neither available
-  if (!hasApi && !hasSubgraph) {
+  if (!hasApi && !hasSubgraph && !hasOn) {
     console.warn(`  [${chainName(chainId)}] No data source configured`)
   }
   return []
