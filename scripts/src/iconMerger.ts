@@ -14,7 +14,7 @@ import path from 'path'
 import sharp from 'sharp'
 import { formatEther } from 'viem'
 import nodeFetch from 'node-fetch'
-import { ICON_DEFAULTS, MORPHO_BADGE_URL } from './config.js'
+import { ICON_DEFAULTS, MORPHO_BADGE_URL, MORPHO_W_SVG_PATH } from './config.js'
 
 // ─── Output directory ────────────────────────────────────────────────────────
 
@@ -194,6 +194,192 @@ export async function mergeSplitWithBadge(
   // Ensure output directory exists, then write
   await fs.promises.mkdir(path.dirname(outputFile), { recursive: true })
   await fs.promises.writeFile(outputFile, final)
+}
+
+// ─── Multi-collateral merge (sliced collateral half) ─────────────────────────
+
+/**
+ * Merge a Morpho Midnight market icon.
+ *
+ * Layout is the same split-half card as `mergeSplitWithBadge`, except the
+ * collateral half (left) is subdivided into one vertical slice per collateral
+ * leg. With a single collateral this is pixel-identical to the Blue layout;
+ * with N collaterals the left half is split into N equal columns, each showing
+ * the corresponding portion of that collateral's logo.
+ *
+ *   [ coll₀ | coll₁ | … | collₙ₋₁ |      loan      ]
+ *
+ * `badgeSrc` is composited directly (no white backing ring) so a self-contained
+ * circular badge — e.g. `morphoMidnightBadgeBuffer()` — renders as-is.
+ */
+export async function mergeMultiCollateralWithBadge(
+  collateralSrcs: Array<string | Buffer>,
+  loanSrc: string | Buffer,
+  badgeSrc: string | Buffer | null,
+  outputFile: string,
+  config: Partial<MergeConfig> = {},
+): Promise<void> {
+  if (collateralSrcs.length === 0) {
+    throw new Error('mergeMultiCollateralWithBadge: no collateral sources')
+  }
+
+  const cfg = { ...DEFAULT_MERGE_CONFIG, ...config }
+  const { diameter, centerPadding, badgePadding, badgeOffsetX, badgeOffsetY } = cfg
+  const half = Math.floor(diameter / 2)
+
+  const squareOpts = {
+    fit: 'contain' as const,
+    background: { r: 255, g: 255, b: 255, alpha: 0 },
+  }
+
+  // Load + letterbox every source into a square viewbox.
+  const [loanBuf, ...collBufs] = await Promise.all([
+    loadImageBuffer(loanSrc),
+    ...collateralSrcs.map((s) => loadImageBuffer(s)),
+  ])
+  const loanSquare = await sharp(loanBuf)
+    .resize(diameter, diameter, squareOpts)
+    .png()
+    .toBuffer()
+  const collSquares = await Promise.all(
+    collBufs.map((b) =>
+      sharp(b).resize(diameter, diameter, squareOpts).png().toBuffer(),
+    ),
+  )
+
+  // Right half = loan token.
+  const loanHalf = await sharp(loanSquare)
+    .extract({ left: half, top: 0, width: diameter - half, height: diameter })
+    .toBuffer()
+
+  const composites: sharp.OverlayOptions[] = [
+    { input: loanHalf, left: half, top: 0 },
+  ]
+
+  // Left half = N collateral columns. Integer boundaries avoid seams/gaps.
+  const n = collSquares.length
+  for (let i = 0; i < n; i++) {
+    const x0 = Math.round((i * half) / n)
+    const x1 = Math.round(((i + 1) * half) / n)
+    const width = x1 - x0
+    if (width <= 0) continue
+    const slice = await sharp(collSquares[i])
+      .extract({ left: x0, top: 0, width, height: diameter })
+      .toBuffer()
+    composites.push({ input: slice, left: x0, top: 0 })
+  }
+
+  const merged = await sharp({
+    create: {
+      width: diameter,
+      height: diameter,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    },
+  })
+    .composite(composites)
+    .png()
+    .toBuffer()
+
+  // Circular crop.
+  const center = await sharp(merged)
+    .composite([{ input: circleSVG(diameter), blend: 'dest-in' }])
+    .png()
+    .toBuffer()
+
+  // Self-contained circular badge, composited directly (top-right).
+  const badgeBuf = badgeSrc ? await loadImageBuffer(badgeSrc) : null
+  const badgeDim = cfg.badgeSize.width + badgePadding * 2
+  const badgeImg = badgeBuf
+    ? await sharp(badgeBuf)
+        .resize(badgeDim, badgeDim, squareOpts)
+        .png()
+        .toBuffer()
+    : null
+
+  const canvasSize = diameter + centerPadding * 2
+  const finalComposites: sharp.OverlayOptions[] = [
+    { input: center, left: centerPadding, top: centerPadding },
+  ]
+  if (badgeImg) {
+    finalComposites.push({
+      input: badgeImg,
+      left: canvasSize - badgeDim - badgeOffsetX,
+      top: centerPadding + badgeOffsetY,
+    })
+  }
+
+  const final = await sharp({
+    create: {
+      width: canvasSize,
+      height: canvasSize,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    },
+  })
+    .composite(finalComposites)
+    .webp()
+    .toBuffer()
+
+  await fs.promises.mkdir(path.dirname(outputFile), { recursive: true })
+  await fs.promises.writeFile(outputFile, final)
+}
+
+// ─── Morpho Midnight badge (black-and-white morpho glyph) ────────────────────
+
+/**
+ * Render the black-and-white "Midnight" badge: the white Morpho glyph centered
+ * on a dark circle. Returns a self-contained circular PNG buffer ready to pass
+ * as `badgeSrc` to `mergeMultiCollateralWithBadge`.
+ */
+export async function morphoMidnightBadgeBuffer(
+  size = ICON_DEFAULTS.badgeSize.width + ICON_DEFAULTS.badgePadding * 2,
+): Promise<Buffer> {
+  const r = size / 2
+  const ring = Buffer.from(
+    `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
+       <circle cx="${r}" cy="${r}" r="${r - 1}" fill="#0a0a0a" stroke="#ffffff" stroke-width="2"/>
+     </svg>`,
+  )
+
+  // Morpho glyph is ~74×69; scale to ~58% of the badge, keep aspect ratio.
+  const glyphSize = Math.round(size * 0.58)
+  const glyph = await sharp(MORPHO_W_SVG_PATH)
+    .resize(glyphSize, glyphSize, {
+      fit: 'contain',
+      background: { r: 255, g: 255, b: 255, alpha: 0 },
+    })
+    .png()
+    .toBuffer()
+  const glyphMeta = await sharp(glyph).metadata()
+  const gw = glyphMeta.width ?? glyphSize
+  const gh = glyphMeta.height ?? glyphSize
+
+  return sharp(ring)
+    .composite([
+      {
+        input: glyph,
+        left: Math.round((size - gw) / 2),
+        top: Math.round((size - gh) / 2),
+      },
+    ])
+    .png()
+    .toBuffer()
+}
+
+/**
+ * Write the standalone dark "Midnight" base icon (used as the generic
+ * `morpho_midnight.webp` fallback when a market-specific icon is missing).
+ * Same dark circle + white glyph as the badge, at full icon size, as WebP.
+ */
+export async function writeMorphoMidnightBaseIcon(
+  outputFile: string,
+  size = 200,
+): Promise<void> {
+  const badge = await morphoMidnightBadgeBuffer(size)
+  const webp = await sharp(badge).webp().toBuffer()
+  await fs.promises.mkdir(path.dirname(outputFile), { recursive: true })
+  await fs.promises.writeFile(outputFile, webp)
 }
 
 // ─── Roman numeral badge (SVG → PNG buffer) ─────────────────────────────────

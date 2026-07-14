@@ -9,6 +9,7 @@
     "generate:silo": "tsx src/generateSilo.ts",
     "generate:fluid": "tsx src/generateFluid.ts",
     "generate:gearbox": "tsx src/generateGearbox.ts",
+    "generate:midnight": "tsx src/generateMidnight.ts",
     "crop": "tsx src/circularCrop.ts"
   },
   "dependencies": {

@@ -176,6 +176,15 @@ export const GEARBOX_CORE_ICON_PATH = path.resolve(
   '../../lender/gearbox_v3.webp',
 )
 
+/**
+ * Local white Morpho glyph — rendered onto a dark circle to form the
+ * black-and-white "Midnight" protocol badge (see `morphoMidnightBadgeBuffer`).
+ */
+export const MORPHO_W_SVG_PATH = path.resolve(
+  import.meta.dirname ?? '.',
+  '../../lender/morpho_w.svg',
+)
+
 // ─── Cycle interval (default 30 min) ─────────────────────────────────────────
 
 export const DEFAULT_CYCLE_INTERVAL_MS = 30 * 60 * 1000
