@@ -39,18 +39,27 @@ export interface MorphoMarket {
 
 const MORPHO_API_URL = 'https://blue-api.morpho.org/graphql'
 
+// Page size for market pagination. 1000 is the API's max `first`; its
+// per-request complexity (~165k) stays well under the 1M ceiling.
+const API_PAGE_SIZE = 1000
+// Safety backstop against a runaway pagination loop (1000 pages = 1M markets).
+const API_MAX_PAGES = 1000
+
+// NOTE: no `listed`/`whitelisted` filter — we want EVERY permissionless market.
+// Order by `UniqueKey` (a stable id present on every market) so skip-based
+// pagination is consistent AND doesn't drop idle markets the way ordering by a
+// numeric metric (e.g. SupplyAssetsUsd) does.
 const apiQuery = (first: number, skip: number, chainId: string) => `
 query GetMarkets {
   markets(first: ${first}, skip: ${skip}, where: {
-    chainId_in: [${chainId}],
-    whitelisted: true
+    chainId_in: [${chainId}]
   },
-  orderBy: SupplyAssetsUsd,
-  orderDirection: Desc
+  orderBy: UniqueKey,
+  orderDirection: Asc
   ) {
     items {
       lltv
-      uniqueKey
+      uniqueKey: marketId
       loanAsset {
         address
         symbol
@@ -62,31 +71,46 @@ query GetMarkets {
         decimals
       }
     }
+    pageInfo {
+      count
+      countTotal
+    }
   }
 }
 `
 
 async function fetchFromApi(chainId: string): Promise<MorphoMarket[]> {
-  // Ethereum has >200 markets, paginate with two requests
-  const isEth = chainId === '1'
-  const requests = isEth
-    ? [apiQuery(200, 0, chainId), apiQuery(200, 200, chainId)]
-    : [apiQuery(500, 0, chainId)]
-
   const results: MorphoMarket[] = []
-  for (const query of requests) {
+
+  // Paginate until every market is fetched. `countTotal` tells us the full set;
+  // a short (or empty) page is the natural terminator past the last one.
+  for (let page = 0; page < API_MAX_PAGES; page++) {
     const res = await fetch(MORPHO_API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query, variables: {} }),
+      body: JSON.stringify({
+        query: apiQuery(API_PAGE_SIZE, page * API_PAGE_SIZE, chainId),
+        variables: {},
+      }),
     })
     if (!res.ok) {
       throw new Error(`Morpho API error (chain ${chainId}): ${res.status} ${res.statusText}`)
     }
     const json: any = await res.json()
-    const items = json?.data?.markets?.items ?? []
+    // Surface GraphQL validation errors loudly (a 200 can still carry errors);
+    // otherwise a silent schema change reads as "0 markets" with no explanation.
+    if (json?.errors?.length) {
+      throw new Error(`Morpho API error (chain ${chainId}): ${json.errors[0].message}`)
+    }
+
+    const marketsPage = json?.data?.markets
+    const items: MorphoMarket[] = marketsPage?.items ?? []
     results.push(...items)
+
+    const countTotal: number = marketsPage?.pageInfo?.countTotal ?? results.length
+    if (items.length < API_PAGE_SIZE || results.length >= countTotal) break
   }
+
   return results
 }
 
