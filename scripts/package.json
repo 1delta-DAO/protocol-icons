@@ -10,6 +10,9 @@
     "generate:fluid": "tsx src/generateFluid.ts",
     "generate:gearbox": "tsx src/generateGearbox.ts",
     "generate:midnight": "tsx src/generateMidnight.ts",
+    "generate:liquity": "tsx src/generateLiquity.ts",
+    "generate:river": "tsx src/generateRiver.ts",
+    "generate:term": "tsx src/generateTermFinance.ts",
     "crop": "tsx src/circularCrop.ts"
   },
   "dependencies": {
