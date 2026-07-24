@@ -13,6 +13,7 @@
     "generate:liquity": "tsx src/generateLiquity.ts",
     "generate:river": "tsx src/generateRiver.ts",
     "generate:term": "tsx src/generateTermFinance.ts",
+    "generate:teller": "tsx src/generateTeller.ts",
     "crop": "tsx src/circularCrop.ts"
   },
   "dependencies": {
