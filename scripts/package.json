@@ -12,6 +12,7 @@
     "generate:midnight": "tsx src/generateMidnight.ts",
     "generate:liquity": "tsx src/generateLiquity.ts",
     "generate:river": "tsx src/generateRiver.ts",
+    "generate:inverse": "tsx src/generateInverse.ts",
     "generate:term": "tsx src/generateTermFinance.ts",
     "generate:teller": "tsx src/generateTeller.ts",
     "generate:termmax": "tsx src/generateTermMax.ts",

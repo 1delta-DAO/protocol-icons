@@ -325,6 +325,145 @@ export async function mergeMultiCollateralWithBadge(
   await fs.promises.writeFile(outputFile, final)
 }
 
+// ─── Stacked-collateral merge (scaled-to-fit collateral legs) ────────────────
+
+/**
+ * Merge a market icon whose collateral is a basket (an LP token, a wrapper over
+ * one, …) with the loan token on the right half.
+ *
+ *   [  coll₀  |                ]
+ *   [ ------- |      loan      ]
+ *   [  collₙ  |                ]
+ *
+ * Unlike `mergeMultiCollateralWithBadge`, which extracts one vertical *slice*
+ * per leg out of a full-size logo, each leg here is scaled to fit its own band
+ * so the whole logo stays legible. Bands are sized against the circle's actual
+ * width at that height, so no leg is clipped by the circular crop.
+ *
+ * `badgeSrc` is composited directly (no white backing ring), matching
+ * `mergeMultiCollateralWithBadge` — pass a self-contained circular badge.
+ */
+export async function mergeStackedCollateralWithBadge(
+  collateralSrcs: Array<string | Buffer>,
+  loanSrc: string | Buffer,
+  badgeSrc: string | Buffer | null,
+  outputFile: string,
+  config: Partial<MergeConfig> = {},
+): Promise<void> {
+  if (collateralSrcs.length === 0) {
+    throw new Error('mergeStackedCollateralWithBadge: no collateral sources')
+  }
+
+  const cfg = { ...DEFAULT_MERGE_CONFIG, ...config }
+  const { diameter, centerPadding, badgePadding, badgeOffsetX, badgeOffsetY } = cfg
+  const half = Math.floor(diameter / 2)
+  const radius = diameter / 2
+
+  const squareOpts = {
+    fit: 'contain' as const,
+    background: { r: 255, g: 255, b: 255, alpha: 0 },
+  }
+
+  const [loanBuf, ...collBufs] = await Promise.all([
+    loadImageBuffer(loanSrc),
+    ...collateralSrcs.map((s) => loadImageBuffer(s)),
+  ])
+
+  // Right half = loan token, same as every other layout.
+  const loanSquare = await sharp(loanBuf)
+    .resize(diameter, diameter, squareOpts)
+    .png()
+    .toBuffer()
+  const loanHalf = await sharp(loanSquare)
+    .extract({ left: half, top: 0, width: diameter - half, height: diameter })
+    .toBuffer()
+
+  const composites: sharp.OverlayOptions[] = [{ input: loanHalf, left: half, top: 0 }]
+
+  // Left half = one scaled-to-fit band per leg.
+  const n = collBufs.length
+  const bandHeight = diameter / n
+  // Leave a hair of breathing room so bands don't touch each other or the rim.
+  const INSET = 0.9
+
+  for (let i = 0; i < n; i++) {
+    const bandCenterY = (i + 0.5) * bandHeight
+    // Width the circle actually offers at this height, on the left of the seam.
+    const dy = Math.abs(bandCenterY - radius)
+    const available = Math.sqrt(Math.max(radius * radius - dy * dy, 0))
+    const size = Math.floor(Math.min(bandHeight, available) * INSET)
+    if (size <= 0) continue
+
+    const leg = await sharp(collBufs[i])
+      .resize(size, size, squareOpts)
+      .png()
+      .toBuffer()
+    const meta = await sharp(leg).metadata()
+    const w = meta.width ?? size
+    const h = meta.height ?? size
+
+    composites.push({
+      input: leg,
+      // Centered in the circle's usable span at this height, not in the band —
+      // that keeps the logo clear of the rim near the top and bottom.
+      left: Math.round(half - available / 2 - w / 2),
+      top: Math.round(bandCenterY - h / 2),
+    })
+  }
+
+  const merged = await sharp({
+    create: {
+      width: diameter,
+      height: diameter,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    },
+  })
+    .composite(composites)
+    .png()
+    .toBuffer()
+
+  // Circular crop.
+  const center = await sharp(merged)
+    .composite([{ input: circleSVG(diameter), blend: 'dest-in' }])
+    .png()
+    .toBuffer()
+
+  // Self-contained circular badge, composited directly (top-right).
+  const badgeBuf = badgeSrc ? await loadImageBuffer(badgeSrc) : null
+  const badgeDim = cfg.badgeSize.width + badgePadding * 2
+  const badgeImg = badgeBuf
+    ? await sharp(badgeBuf).resize(badgeDim, badgeDim, squareOpts).png().toBuffer()
+    : null
+
+  const canvasSize = diameter + centerPadding * 2
+  const finalComposites: sharp.OverlayOptions[] = [
+    { input: center, left: centerPadding, top: centerPadding },
+  ]
+  if (badgeImg) {
+    finalComposites.push({
+      input: badgeImg,
+      left: canvasSize - badgeDim - badgeOffsetX,
+      top: centerPadding + badgeOffsetY,
+    })
+  }
+
+  const final = await sharp({
+    create: {
+      width: canvasSize,
+      height: canvasSize,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    },
+  })
+    .composite(finalComposites)
+    .webp()
+    .toBuffer()
+
+  await fs.promises.mkdir(path.dirname(outputFile), { recursive: true })
+  await fs.promises.writeFile(outputFile, final)
+}
+
 // ─── Morpho Midnight badge (black-and-white morpho glyph) ────────────────────
 
 /**
