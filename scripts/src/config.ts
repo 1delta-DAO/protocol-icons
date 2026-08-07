@@ -38,6 +38,9 @@ export const ChainId = {
   KATANA: '824',
   HYPEREVM: '999',
   ABSTRACT: '2741',
+  // Curvance (Monad-only, not a Morpho fork — listed here for chainName/token-list
+  // resolution used by the Curvance generator)
+  MONAD: '143',
   // Mystic Finance (Morpho Blue fork) chains
   FLARE: '14',
   CITREA: '4114',
@@ -135,6 +138,7 @@ export const CHAIN_NAMES: Record<string, string> = {
   [ChainId.KATANA]: 'Katana',
   [ChainId.HYPEREVM]: 'HyperEVM',
   [ChainId.ABSTRACT]: 'Abstract',
+  [ChainId.MONAD]: 'Monad',
   [ChainId.FLARE]: 'Flare',
   [ChainId.CITREA]: 'Citrea',
   [ChainId.PLUME]: 'Plume',

@@ -17,7 +17,8 @@
     "generate:teller": "tsx src/generateTeller.ts",
     "generate:termmax": "tsx src/generateTermMax.ts",
     "generate:llamalend": "tsx src/generateLlamaLend.ts",
-    "crop": "tsx src/circularCrop.ts"
+    "crop": "tsx src/circularCrop.ts",
+    "generate:curvance": "tsx src/generateCurvance.ts"
   },
   "dependencies": {
     "@1delta/initializer-sdk": "latest",
