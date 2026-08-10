@@ -19,7 +19,9 @@
     "generate:llamalend": "tsx src/generateLlamaLend.ts",
     "generate:lista": "tsx src/generateLista.ts",
     "crop": "tsx src/circularCrop.ts",
-    "generate:curvance": "tsx src/generateCurvance.ts"
+    "generate:curvance": "tsx src/generateCurvance.ts",
+    "generate:sky": "tsx src/generateSky.ts",
+    "generate:frankencoin": "tsx src/generateFrankencoin.ts"
   },
   "dependencies": {
     "@1delta/initializer-sdk": "latest",
