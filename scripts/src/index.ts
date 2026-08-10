@@ -6,6 +6,11 @@
  * logos from the delta token list, and generates split-half market icons
  * with a Morpho badge overlay.
  *
+ * Scope: Morpho Blue (and API/subgraph-shaped forks) ONLY — every icon written
+ * here is `morpho_blue_<marketId>`. Lista DAO / Moolah is a Blue fork but has
+ * its own lender key, badge and roster-plus-on-chain data source, so it lives
+ * in `generateLista.ts` (`npm run generate:lista`). Do not fold it back in.
+ *
  * Modes:
  *   npm run generate            # one-shot: run once and exit
  *   npm run generate:watch      # cyclical: repeat every 30 min (configurable)
