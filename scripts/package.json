@@ -21,6 +21,7 @@
     "generate:lista": "tsx src/generateLista.ts",
     "crop": "tsx src/circularCrop.ts",
     "generate:curvance": "tsx src/generateCurvance.ts",
+    "generate:twyne": "tsx src/generateTwyne.ts",
     "generate:sky": "tsx src/generateSky.ts",
     "generate:frankencoin": "tsx src/generateFrankencoin.ts"
   },
