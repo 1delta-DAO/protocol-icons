@@ -77,6 +77,38 @@ export function lltvToBpsSuperscript(lltv: string): string {
     .join('')
 }
 
+// ─── Badge ring ──────────────────────────────────────────────────────────────
+
+/**
+ * Wrap an already-circular badge in a white ring of `ring` px.
+ *
+ * The badge sits on top of the market artwork, and on a dark logo a dark badge
+ * reads as a smudge rather than a mark; the ring gives it an edge to hold onto.
+ * Returns the input untouched when `ring <= 0`, so every existing caller keeps
+ * byte-identical output.
+ */
+async function withBadgeRing(badge: Buffer, dim: number, ring: number): Promise<Buffer> {
+  if (ring <= 0) return badge
+
+  const outer = dim + ring * 2
+  const disc = await sharp({
+    create: {
+      width: outer,
+      height: outer,
+      channels: 4,
+      background: { r: 255, g: 255, b: 255, alpha: 1 },
+    },
+  })
+    .composite([{ input: circleSVG(outer), blend: 'dest-in' }])
+    .png()
+    .toBuffer()
+
+  return sharp(disc)
+    .composite([{ input: badge, left: ring, top: ring }])
+    .png()
+    .toBuffer()
+}
+
 // ─── Split-half merge with badge ─────────────────────────────────────────────
 
 export interface MergeConfig {
@@ -86,6 +118,12 @@ export interface MergeConfig {
   badgePadding: number
   badgeOffsetX: number
   badgeOffsetY: number
+  /**
+   * Thickness, in px, of a white ring drawn around the badge to lift it off the
+   * artwork underneath. 0 (the default) keeps the historical look: the badge is
+   * composited as-is, with only whatever white `badgePadding` backs it.
+   */
+  badgeRing: number
 }
 
 const DEFAULT_MERGE_CONFIG: MergeConfig = {
@@ -95,6 +133,7 @@ const DEFAULT_MERGE_CONFIG: MergeConfig = {
   badgePadding: ICON_DEFAULTS.badgePadding,
   badgeOffsetX: ICON_DEFAULTS.badgeOffsetX,
   badgeOffsetY: ICON_DEFAULTS.badgeOffsetY,
+  badgeRing: 0,
 }
 
 /**
@@ -109,7 +148,7 @@ export async function mergeSplitWithBadge(
   config: Partial<MergeConfig> = {},
 ): Promise<void> {
   const cfg = { ...DEFAULT_MERGE_CONFIG, ...config }
-  const { diameter, centerPadding, badgeSize, badgePadding, badgeOffsetX, badgeOffsetY } = cfg
+  const { diameter, centerPadding, badgeSize, badgePadding, badgeOffsetX, badgeOffsetY, badgeRing } = cfg
   const half = Math.floor(diameter / 2)
 
   // Load sources in parallel; badge may be omitted for badge-less icons.
@@ -171,16 +210,18 @@ export async function mergeSplitWithBadge(
         .png()
         .toBuffer()
     : null
+  const ringedBadge = badgeImg ? await withBadgeRing(badgeImg, padW, badgeRing) : null
+  const badgeDim = padW + badgeRing * 2
 
   // Final composite
   const canvasSize = diameter + centerPadding * 2
   const composites: sharp.OverlayOptions[] = [
     { input: center, left: centerPadding, top: centerPadding },
   ]
-  if (badgeImg) {
+  if (ringedBadge) {
     composites.push({
-      input: badgeImg,
-      left: canvasSize - padW - badgeOffsetX,
+      input: ringedBadge,
+      left: canvasSize - badgeDim - badgeOffsetX,
       top: centerPadding + badgeOffsetY,
     })
   }
@@ -434,6 +475,148 @@ export async function mergeStackedCollateralWithBadge(
   const badgeDim = cfg.badgeSize.width + badgePadding * 2
   const badgeImg = badgeBuf
     ? await sharp(badgeBuf).resize(badgeDim, badgeDim, squareOpts).png().toBuffer()
+    : null
+
+  const canvasSize = diameter + centerPadding * 2
+  const finalComposites: sharp.OverlayOptions[] = [
+    { input: center, left: centerPadding, top: centerPadding },
+  ]
+  if (badgeImg) {
+    finalComposites.push({
+      input: badgeImg,
+      left: canvasSize - badgeDim - badgeOffsetX,
+      top: centerPadding + badgeOffsetY,
+    })
+  }
+
+  const final = await sharp({
+    create: {
+      width: canvasSize,
+      height: canvasSize,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    },
+  })
+    .composite(finalComposites)
+    .webp()
+    .toBuffer()
+
+  await fs.promises.mkdir(path.dirname(outputFile), { recursive: true })
+  await fs.promises.writeFile(outputFile, final)
+}
+
+// ─── Reserve-cluster merge (pool icons, no collateral/loan pair) ─────────────
+
+/**
+ * Merge a *pool* icon: N reserve logos arranged as a cluster inside the circle,
+ * with a protocol badge on top-right.
+ *
+ * Unlike every other layout here, this one does NOT model a collateral/loan
+ * pair — it exists for lenders whose market is a basket of reserves that are
+ * all borrowable against each other (Aave v4 spokes). There is no meaningful
+ * left/right split to make, so each reserve gets its own circular chip:
+ *
+ *   n=2   [ (a) (b) ]        side by side
+ *   n=3   [ (a) (b) / (c) ]  triangle, apex up
+ *   n=4   [ (a)(b) / (c)(d) ] 2x2 grid
+ *
+ * Chips are laid out on a ring of radius `d` around the centre, sized so that
+ * neighbours just touch before a `CHIP_GAP` shrink is applied, and so that no
+ * chip crosses the outer circle:
+ *
+ *   r = R·sin(π/n) / (1 + sin(π/n)),   d = R − r
+ *
+ * `badgeSrc` is composited directly (no white backing ring), matching
+ * `mergeMultiCollateralWithBadge` — pass a self-contained circular badge.
+ */
+export async function mergeClusterWithBadge(
+  srcs: Array<string | Buffer>,
+  badgeSrc: string | Buffer | null,
+  outputFile: string,
+  config: Partial<MergeConfig> = {},
+): Promise<void> {
+  if (srcs.length === 0) {
+    throw new Error('mergeClusterWithBadge: no sources')
+  }
+
+  const cfg = { ...DEFAULT_MERGE_CONFIG, ...config }
+  const { diameter, centerPadding, badgePadding, badgeOffsetX, badgeOffsetY, badgeRing } = cfg
+  const radius = diameter / 2
+
+  const squareOpts = {
+    fit: 'contain' as const,
+    background: { r: 255, g: 255, b: 255, alpha: 0 },
+  }
+
+  const bufs = await Promise.all(srcs.map((s) => loadImageBuffer(s)))
+  const n = bufs.length
+
+  // Chip radius / ring radius. A single chip fills the circle outright.
+  const sin = Math.sin(Math.PI / n)
+  const chipR = n === 1 ? radius : (radius * sin) / (1 + sin)
+  const ringR = n === 1 ? 0 : radius - chipR
+
+  // A 2x2 grid reads better than a diamond, so start 4-chip clusters at 135°.
+  const startAngle = n === 4 ? (-3 * Math.PI) / 4 : -Math.PI / 2
+
+  // Shrink each chip slightly so neighbours have visible breathing room.
+  const CHIP_GAP = 0.94
+  const chipDim = Math.max(2, Math.round(chipR * 2 * CHIP_GAP))
+
+  const chips = await Promise.all(
+    bufs.map(async (b) => {
+      // Letterbox onto white, then circular-crop: a chip is a mini token icon.
+      const square = await sharp(b)
+        .resize(chipDim, chipDim, squareOpts)
+        .flatten({ background: '#ffffff' })
+        .ensureAlpha()
+        .png()
+        .toBuffer()
+      return sharp(square)
+        .composite([{ input: circleSVG(chipDim), blend: 'dest-in' }])
+        .png()
+        .toBuffer()
+    }),
+  )
+
+  const composites: sharp.OverlayOptions[] = chips.map((chip, i) => {
+    const angle = startAngle + (i * 2 * Math.PI) / n
+    const cx = radius + ringR * Math.cos(angle)
+    const cy = radius + ringR * Math.sin(angle)
+    return {
+      input: chip,
+      left: Math.round(cx - chipDim / 2),
+      top: Math.round(cy - chipDim / 2),
+    }
+  })
+
+  const center = await sharp({
+    create: {
+      width: diameter,
+      height: diameter,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    },
+  })
+    .composite(composites)
+    .png()
+    .toBuffer()
+
+  // Badge: cropped to a circle to guarantee clean edges, then optionally ringed.
+  const discDim = cfg.badgeSize.width + badgePadding * 2
+  const badgeDim = discDim + badgeRing * 2
+  const bb = badgeSrc ? await loadImageBuffer(badgeSrc) : null
+  const badgeImg = bb
+    ? await withBadgeRing(
+        await sharp(
+          await sharp(bb).resize(discDim, discDim, squareOpts).png().toBuffer(),
+        )
+          .composite([{ input: circleSVG(discDim), blend: 'dest-in' }])
+          .png()
+          .toBuffer(),
+        discDim,
+        badgeRing,
+      )
     : null
 
   const canvasSize = diameter + centerPadding * 2

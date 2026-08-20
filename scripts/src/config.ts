@@ -180,6 +180,21 @@ export const GEARBOX_CORE_ICON_PATH = path.resolve(
   '../../lender/gearbox_v3.webp',
 )
 
+/** Local Aave v4 badge — used as the protocol overlay for spoke icons. */
+export const AAVE_V4_BADGE_PATH = path.resolve(
+  import.meta.dirname ?? '.',
+  '../../lender/aave_v4.webp',
+)
+
+/**
+ * Published Aave v4 spoke roster (1delta lender-metadata).
+ *
+ * chainId → spoke address → { label, reserves[] }. This is the same file the
+ * app reads, so icon names stay in lockstep with the lender keys it emits.
+ */
+export const AAVE_V4_SPOKES_URL =
+  'https://raw.githubusercontent.com/1delta-DAO/lender-metadata/main/data/aave-v4-spokes.json'
+
 /**
  * Local white Morpho glyph — rendered onto a dark circle to form the
  * black-and-white "Midnight" protocol badge (see `morphoMidnightBadgeBuffer`).

@@ -23,7 +23,8 @@
     "generate:curvance": "tsx src/generateCurvance.ts",
     "generate:twyne": "tsx src/generateTwyne.ts",
     "generate:sky": "tsx src/generateSky.ts",
-    "generate:frankencoin": "tsx src/generateFrankencoin.ts"
+    "generate:frankencoin": "tsx src/generateFrankencoin.ts",
+    "generate:aave-v4": "tsx src/generateAaveV4.ts"
   },
   "dependencies": {
     "@1delta/initializer-sdk": "latest",
