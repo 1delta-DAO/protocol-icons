@@ -109,6 +109,70 @@ async function withBadgeRing(badge: Buffer, dim: number, ring: number): Promise<
     .toBuffer()
 }
 
+// ─── Unknown-asset placeholder ───────────────────────────────────────────────
+
+/**
+ * Neutral "no logo" chip, used in place of a token whose logo the token list
+ * doesn't carry — so one unresolvable leg costs that leg, not the whole icon.
+ *
+ * Two constraints shape the design:
+ *
+ *   - It must survive *vertical slicing*. `mergeMultiCollateralWithBadge` shows
+ *     each collateral leg as one narrow band of its logo, so a centred glyph
+ *     alone would be cut to an unreadable fragment. The diagonal hatch is what
+ *     carries the meaning there: every band of it looks like the same "unknown"
+ *     texture, whichever part of the disc gets shown.
+ *   - It must read as *deliberate*, not as a broken image. Hence a muted chip
+ *     in the same circular silhouette as a real token logo, rather than an
+ *     empty hole or a magenta error swatch.
+ *
+ * Cached per size — the same buffer is reused for every leg of every market.
+ */
+const UNKNOWN_ASSET_CACHE = new Map<number, Buffer>()
+
+export async function unknownAssetBuffer(size = ICON_DEFAULTS.diameter): Promise<Buffer> {
+  const cached = UNKNOWN_ASSET_CACHE.get(size)
+  if (cached) return cached
+
+  const r = size / 2
+  const gap = Math.max(4, Math.round(size / 11))
+  const stroke = Math.max(1, Math.round(size / 34))
+
+  // 45° hatch across the whole square; the circular crop below trims it.
+  const hatch: string[] = []
+  for (let x = -size; x < size * 2; x += gap) {
+    hatch.push(
+      `<line x1="${x}" y1="0" x2="${x + size}" y2="${size}" ` +
+        `stroke="#c3cad5" stroke-width="${stroke}" />`,
+    )
+  }
+
+  // librsvg ignores `dominant-baseline` (see `romanNumeralBadgeBuffer`), so the
+  // baseline is placed by hand to centre the glyph.
+  const fontSize = Math.round(size * 0.52)
+  const baselineY = r + fontSize * 0.35
+
+  const svg = Buffer.from(
+    `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
+       <rect width="${size}" height="${size}" fill="#e7ebf1" />
+       ${hatch.join('')}
+       <circle cx="${r}" cy="${r}" r="${r - stroke}" fill="none"
+               stroke="#aab3c0" stroke-width="${stroke}" />
+       <text x="${r}" y="${baselineY}" text-anchor="middle"
+             font-family="DejaVu Sans, Helvetica, Arial, sans-serif"
+             font-size="${fontSize}" font-weight="bold" fill="#636e7e">?</text>
+     </svg>`,
+  )
+
+  const disc = await sharp(await sharp(svg).png().toBuffer())
+    .composite([{ input: circleSVG(size), blend: 'dest-in' }])
+    .png()
+    .toBuffer()
+
+  UNKNOWN_ASSET_CACHE.set(size, disc)
+  return disc
+}
+
 // ─── Split-half merge with badge ─────────────────────────────────────────────
 
 export interface MergeConfig {
