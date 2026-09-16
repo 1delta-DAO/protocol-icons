@@ -32,12 +32,21 @@ export const ChainId = {
   CELO: '42220',
   LISK: '1135',
   SONEIUM: '1868',
-  TAC: '2390',
+  // TAC is 239 — the earlier '2390' was wrong and so its subgraph was never
+  // queried (2026-09-16).
+  TAC: '239',
   HEMI: '43111',
   BERACHAIN: '80094',
-  KATANA: '824',
+  // Katana is 747474 — the earlier '824' was wrong and returned 0 markets from
+  // the API on every run (2026-09-16).
+  KATANA: '747474',
   HYPEREVM: '999',
   ABSTRACT: '2741',
+  // blue-api chains added 2026-09-16 (its `{ chains }` roster).
+  STABLE: '988',
+  TEMPO: '4217',
+  ROBINHOOD: '4663',
+  ARC: '5042',
   // Curvance (Monad-only, not a Morpho fork — listed here for chainName/token-list
   // resolution used by the Curvance generator)
   MONAD: '143',
@@ -89,6 +98,15 @@ export const API_CHAINS: string[] = [
   ChainId.KATANA,
   ChainId.HYPEREVM,
   ChainId.ABSTRACT,
+  // Checked against blue-api's own `{ chains { id } }` on 2026-09-16, which
+  // lists exactly: 1, 10, 130, 137, 143, 480, 988, 999, 4217, 4663, 5042,
+  // 8453, 42161, 747474. Chains above that the API no longer indexes simply
+  // fall through to their subgraph / on-chain source.
+  ChainId.MONAD,
+  ChainId.STABLE,
+  ChainId.TEMPO,
+  ChainId.ROBINHOOD,
+  ChainId.ARC,
 ]
 
 /** Chains served by subgraph only */
@@ -139,6 +157,10 @@ export const CHAIN_NAMES: Record<string, string> = {
   [ChainId.HYPEREVM]: 'HyperEVM',
   [ChainId.ABSTRACT]: 'Abstract',
   [ChainId.MONAD]: 'Monad',
+  [ChainId.STABLE]: 'Stable',
+  [ChainId.TEMPO]: 'Tempo',
+  [ChainId.ROBINHOOD]: 'Robinhood',
+  [ChainId.ARC]: 'Arc',
   [ChainId.FLARE]: 'Flare',
   [ChainId.CITREA]: 'Citrea',
   [ChainId.PLUME]: 'Plume',

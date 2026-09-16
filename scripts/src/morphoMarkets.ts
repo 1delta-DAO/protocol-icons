@@ -26,6 +26,13 @@ export interface MorphoMarketAsset {
   address: string
   symbol: string
   decimals: number
+  /**
+   * Morpho's own asset art (`cdn.morpho.org/assets/logos/<symbol>.svg`), served
+   * by blue-api only — subgraph / on-chain sources leave it undefined. Used as
+   * the last-resort logo source when neither the token list nor the SmolDapp
+   * CDN carries the asset, which on a NEW chain is most of them.
+   */
+  logoURI?: string | null
 }
 
 export interface MorphoMarket {
@@ -64,11 +71,13 @@ query GetMarkets {
         address
         symbol
         decimals
+        logoURI
       }
       collateralAsset {
         address
         symbol
         decimals
+        logoURI
       }
     }
     pageInfo {

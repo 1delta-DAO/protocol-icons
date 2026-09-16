@@ -26,6 +26,7 @@ import fs from 'fs'
 import { ALL_CHAINS, DEFAULT_CYCLE_INTERVAL_MS, chainName, MORPHO_BADGE_URL } from './config.js'
 import { fetchTokenMap, type TokenMap } from './tokenList.js'
 import { fetchMarketsForChain, type MorphoMarket } from './morphoMarkets.js'
+import { resolveCollateralArt } from './inverseMarkets.js'
 import {
   mergeSplitWithBadge,
   outPath,
@@ -41,6 +42,33 @@ interface GenerationStats {
   skipped: number
   failed: number
   missingLogos: number
+}
+
+/**
+ * Last-resort art by SYMBOL from the big chains' token lists (Ethereum, Base,
+ * Arbitrum), built once per run. A bridged / restaked asset on a new chain
+ * (sdeUSD, ezETH, deUSD on World Chain) is the same brand everywhere, and its
+ * own chain's list simply has not caught up. Symbol collisions are possible
+ * but only ever cost a wrong LOGO on a market whose alternative is no icon at
+ * all — never a wrong address anywhere.
+ */
+let symbolLogoCache: Map<string, string> | undefined
+async function symbolLogoFallback(): Promise<Map<string, string>> {
+  if (symbolLogoCache) return symbolLogoCache
+  const map = new Map<string, string>()
+  for (const chainId of ['1', '8453', '42161']) {
+    try {
+      const list = await fetchTokenMap(chainId)
+      for (const t of Object.values(list)) {
+        const sym = t.symbol?.toLowerCase()
+        if (sym && t.logoURI && !map.has(sym)) map.set(sym, t.logoURI)
+      }
+    } catch (err) {
+      console.warn(`  symbol fallback: token list ${chainId} unavailable:`, (err as Error).message)
+    }
+  }
+  symbolLogoCache = map
+  return map
 }
 
 async function processChain(chainId: string, force: boolean): Promise<GenerationStats> {
@@ -84,20 +112,37 @@ async function processChain(chainId: string, force: boolean): Promise<Generation
     const loanToken = tokenMap[loanAddr]
     const collToken = tokenMap[collAddr]
 
-    const loanLogo = loanToken?.logoURI
-    const collLogo = collToken?.logoURI
-
-    if (!loanLogo || !collLogo) {
-      stats.missingLogos++
-      continue
-    }
-
     const enumName = marketEnumName(market.uniqueKey)
     const filePath = outPath(enumName)
 
-    // Safe: skip if icon already exists (unless --force)
+    // Safe: skip if icon already exists (unless --force). Checked BEFORE the
+    // art lookup so an existing icon never costs a CDN round trip.
     if (!force && fs.existsSync(filePath)) {
       stats.skipped++
+      continue
+    }
+
+    // Token list first, then the SmolDapp CDN, then LP legs — the same
+    // resolver the Sky / Frankencoin / Inverse generators use — and finally
+    // Morpho's own `cdn.morpho.org` art off the API row. Before this the
+    // Morpho generator read `logoURI` off the token list alone, so every
+    // market with one asset the list does not carry had no icon at all
+    // (Tempo's only listed market, pathUSD/cbBTC, among them).
+    const [loanArt, collArt] = await Promise.all([
+      resolveCollateralArt(chainId, loanAddr, tokenMap),
+      resolveCollateralArt(chainId, collAddr, tokenMap),
+    ])
+    let loanLogo = loanArt?.sources[0] ?? market.loanAsset.logoURI ?? undefined
+    let collLogo = collArt?.sources[0] ?? market.collateralAsset.logoURI ?? undefined
+
+    if (!loanLogo || !collLogo) {
+      const bySymbol = await symbolLogoFallback()
+      loanLogo ??= bySymbol.get(market.loanAsset.symbol?.toLowerCase() ?? '')
+      collLogo ??= bySymbol.get(market.collateralAsset.symbol?.toLowerCase() ?? '')
+    }
+
+    if (!loanLogo || !collLogo) {
+      stats.missingLogos++
       continue
     }
 
@@ -131,13 +176,14 @@ async function processChain(chainId: string, force: boolean): Promise<Generation
 async function runOnce(force: boolean): Promise<void> {
   console.log(`\n${'='.repeat(60)}`)
   console.log(`Morpho Icon Generator — ${new Date().toISOString()}`)
-  console.log(`Processing ${ALL_CHAINS.length} chains...`)
+  const chains = CHAIN_FILTER ?? ALL_CHAINS
+  console.log(`Processing ${chains.length} chains...`)
   if (force) console.log('Force mode: existing icons will be overwritten.')
   console.log('='.repeat(60))
 
   const totals: GenerationStats = { total: 0, created: 0, skipped: 0, failed: 0, missingLogos: 0 }
 
-  for (const chainId of ALL_CHAINS) {
+  for (const chainId of chains) {
     const stats = await processChain(chainId, force)
     totals.total += stats.total
     totals.created += stats.created
@@ -158,6 +204,12 @@ async function runOnce(force: boolean): Promise<void> {
 
 const isWatch = process.argv.includes('--watch')
 const force = process.argv.includes('--force')
+// `--chains=480,4217` restricts a run to those chain ids (a new chain, or a
+// re-render) — a full run walks every missing Base dust market through the CDN.
+const chainsArg = process.argv.find((a) => a.startsWith('--chains='))
+const CHAIN_FILTER: string[] | undefined = chainsArg
+  ? chainsArg.split('=')[1].split(',').map((c) => c.trim()).filter(Boolean)
+  : undefined
 const intervalArg = process.argv.find((a) => a.startsWith('--interval='))
 const intervalMs = intervalArg
   ? parseInt(intervalArg.split('=')[1], 10) * 60 * 1000  // --interval=N  (minutes)
