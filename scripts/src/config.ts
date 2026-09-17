@@ -47,6 +47,9 @@ export const ChainId = {
   TEMPO: '4217',
   ROBINHOOD: '4663',
   ARC: '5042',
+  // Morpho chain with neither API nor subgraph — markets come from the
+  // `CreateMarket` log replay in `onchainMorpho.ts`.
+  XDC: '50',
   // Curvance (Monad-only, not a Morpho fork — listed here for chainName/token-list
   // resolution used by the Curvance generator)
   MONAD: '143',
@@ -112,6 +115,12 @@ export const API_CHAINS: string[] = [
 /** Chains served by subgraph only */
 export const SUBGRAPH_CHAINS: string[] = Object.keys(MORPHO_SUBGRAPH_URLS)
 
+/**
+ * Chains served only by the on-chain log replay (`onchainMorpho.ts`): not in
+ * the API roster and no subgraph, so they'd never enter ALL_CHAINS otherwise.
+ */
+export const ONCHAIN_ONLY_CHAINS: string[] = [ChainId.XDC]
+
 /** Chains served by the Mystic Finance Morpho-fork API */
 export const MYSTIC_CHAINS: string[] = [
   ChainId.FLARE,
@@ -123,6 +132,9 @@ export const MYSTIC_CHAINS: string[] = [
 export const ALL_CHAINS: string[] = [
   ...API_CHAINS,
   ...SUBGRAPH_CHAINS.filter((c) => !API_CHAINS.includes(c)),
+  ...ONCHAIN_ONLY_CHAINS.filter(
+    (c) => !API_CHAINS.includes(c) && !SUBGRAPH_CHAINS.includes(c),
+  ),
   ...MYSTIC_CHAINS.filter(
     (c) => !API_CHAINS.includes(c) && !SUBGRAPH_CHAINS.includes(c),
   ),
@@ -156,6 +168,7 @@ export const CHAIN_NAMES: Record<string, string> = {
   [ChainId.KATANA]: 'Katana',
   [ChainId.HYPEREVM]: 'HyperEVM',
   [ChainId.ABSTRACT]: 'Abstract',
+  [ChainId.XDC]: 'XDC',
   [ChainId.MONAD]: 'Monad',
   [ChainId.STABLE]: 'Stable',
   [ChainId.TEMPO]: 'Tempo',

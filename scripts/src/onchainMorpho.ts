@@ -71,16 +71,36 @@ export const ONCHAIN_CONFIGS: Record<string, OnchainConfig> = {
     }),
   },
   // Abstract (2741)
+  // NOT the canonical CreateX address — that one has no code on Abstract.
+  // Address and deploy block from lender-metadata `config/morpho-addresses.json`.
+  // The public RPC serves the whole history in one `getLogs`, so chunk wide.
   '2741': {
-    morpho: CANONICAL_MORPHO,
-    fromBlock: 0n,
-    blockChunk: 9_000n,
+    morpho: '0xc85CE8ffdA27b646D269516B8d0Fa6ec2E958B55',
+    fromBlock: 13_947_713n,
+    blockChunk: 10_000_000n,
     rpcUrls: ['https://api.mainnet.abs.xyz'],
     chain: defineChain({
       id: 2741,
       name: 'Abstract',
       nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
       rpcUrls: { default: { http: ['https://api.mainnet.abs.xyz'] } },
+    }),
+  },
+  // XDC (50)
+  // Same non-canonical situation as Abstract. `rpc.xdc.network` is the only
+  // public endpoint found that answers `eth_getLogs` at all — ankr / xdcrpc
+  // reject every range down to 2k blocks — and it serves the full history in
+  // one call, so chunk wide here too.
+  '50': {
+    morpho: '0xEa49B0fE898aF913A3826F9f462eE2cDcb854fD9',
+    fromBlock: 101_757_515n,
+    blockChunk: 10_000_000n,
+    rpcUrls: ['https://rpc.xdc.network'],
+    chain: defineChain({
+      id: 50,
+      name: 'XDC',
+      nativeCurrency: { name: 'XDC', symbol: 'XDC', decimals: 18 },
+      rpcUrls: { default: { http: ['https://rpc.xdc.network'] } },
     }),
   },
 }
