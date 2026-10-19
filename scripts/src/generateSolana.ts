@@ -10,7 +10,8 @@
  *                               reserves by deposits, or a split card when
  *                               only two resolve
  *   JUPITER_LEND                collateral | debt split card (Fluid shape)
- *   LOOPSCALE                   collateral | principal split card (Midnight
+ *   LOOPSCALE /                 collateral | principal split card (Midnight
+ *   JUPITER_OFFERBOOK
  *                               pair shape); an unresolved leg renders as the
  *                               neutral `unknownAssetBuffer` chip
  *

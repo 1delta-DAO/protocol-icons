@@ -9,6 +9,7 @@
  *   PROJECT_0_<groupPubkey>               pooled group  (Aave-shaped)
  *   JUPITER_LEND_<market>_<vaultId>       collateral / debt vault (Fluid)
  *   LOOPSCALE_<principal>_<collateral>    collateral / principal pair (Midnight)
+ *   JUPITER_OFFERBOOK_<principal>_<coll>  collateral / principal pair (Midnight)
  *
  * The roster comes from `@1delta/margin-fetcher-sol` — the same fetch
  * yield-tracer's Solana lending job and lender-metadata's
@@ -132,7 +133,7 @@ export async function fetchSolanaMarkets(families: string[] = SVM_LENDERS): Prom
 
     let pair: SolanaMarket['pair']
     const jl = bundle.params?.jupiterLendVault
-    const ls = bundle.params?.loopscaleMarket
+    const ls = bundle.params?.loopscaleMarket ?? bundle.params?.offerbookMarket
     if (jl) pair = { collateral: jl.supplyToken, debt: jl.borrowToken }
     else if (ls) pair = { collateral: ls.collateralMint, debt: ls.principalMint }
 
