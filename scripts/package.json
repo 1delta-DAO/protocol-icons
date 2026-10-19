@@ -18,6 +18,7 @@
     "generate:termmax": "tsx src/generateTermMax.ts",
     "generate:llamalend": "tsx src/generateLlamaLend.ts",
     "generate:fraxlend": "tsx src/generateFraxlend.ts",
+    "generate:alchemix": "tsx src/generateAlchemix.ts",
     "generate:lista": "tsx src/generateLista.ts",
     "crop": "tsx src/circularCrop.ts",
     "generate:curvance": "tsx src/generateCurvance.ts",
