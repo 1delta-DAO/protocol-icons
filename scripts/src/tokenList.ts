@@ -33,7 +33,7 @@ const GH_TOKEN_LIST_URL = (chainId: string) =>
 export async function fetchTokenMap(chainId: string): Promise<TokenMap> {
   // Try SDK first
   try {
-    const sdkList = await getDeltaTokenList(Number(chainId))
+    const sdkList = await getDeltaTokenList(chainId)
     if (sdkList && typeof sdkList === 'object' && Object.keys(sdkList).length > 0) {
       return normalizeTokenMap(sdkList)
     }
