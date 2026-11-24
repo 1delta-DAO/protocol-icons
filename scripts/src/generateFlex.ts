@@ -59,6 +59,20 @@ const MARKETS: FlexMarket[] = [
     borrowToken: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
     label: "WETH / yvWETH-2",
   },
+  {
+    chainId: "1",
+    troveManager: "0x0D50e97b521D62E1509Ca408ADE621658c367bed",
+    collateral: "0xDBDC1Ef57537E34680B898E1FEBD3D68c7389bCB",
+    borrowToken: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+    label: "USDC / siUSD",
+  },
+  {
+    chainId: "1",
+    troveManager: "0x5fF405CC51705D609F7F2CCc2Bb36a66675938fC",
+    collateral: "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0",
+    borrowToken: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+    label: "WETH / wstETH",
+  },
 ];
 
 const yearnLogo = (chainId: string, token: string) =>
